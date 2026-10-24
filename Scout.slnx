@@ -1,3 +1,7 @@
 <Solution>
+  <Project Path="Dex.Application/Dex.Application.csproj" />
+  <Project Path="Dex.Domain/Dex.Domain.csproj" />
+  <Project Path="Dex.Infrastructure/Dex.Infrastructure.csproj" />
+  <Project Path="Dex.Tests/Dex.Tests.csproj" />
   <Project Path="Scout/Scout.csproj" />
 </Solution>
