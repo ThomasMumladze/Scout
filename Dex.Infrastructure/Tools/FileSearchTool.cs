@@ -15,16 +15,20 @@ public class FileSearchTool(string rootDirectory) :ITool
     private static readonly string[] IgnoredDirs = ["bin", "obj", "node_modules", ".git", ".vs"];
     private const int MaxResults = 10;
 
+    // Do not skip ReparsePoint here: OneDrive placeholders have that attribute too
     private static readonly EnumerationOptions EnumerationSettings = new()
     {
         IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.Hidden | FileAttributes.System
+        AttributesToSkip = FileAttributes.System
     };
 
     public string Name => "search_files";
 
-    public string Description => "Searches the user's local project files for lines containing a text. " +
-        "Use it when the user asks where something is defined or used in the code.";
+    public string Description =>
+    "Searches the user's local C# project files for lines containing a text. " +
+    "Use it when the user asks where something is defined or used in the code. " +
+    "The query must be a short exact identifier such as a class or method name (for example 'ToolCallParser'). " +
+    "Do not add language keywords like 'def' or 'class' to the query.";
 
     public string Parameters => "{\"query\": \"string\"}";
 
@@ -54,7 +58,7 @@ public class FileSearchTool(string rootDirectory) :ITool
         // Return a readable message for the model: either "no matches" or one match per line.
         // The method is not async, so the result is wrapped in a completed Task
         return Task.FromResult(results.Count == 0
-            ? $"No matches found for '{query}'."
+            ? $"No matches found for '{queryString}'. Try again with only the bare identifier name, without extra words or keywords."
             : string.Join("\n", results));
 
     }
@@ -113,11 +117,15 @@ public class FileSearchTool(string rootDirectory) :ITool
                     yield return file;
             }
 
-            // Remember subfolders to visit later (unless they are on the ignore list)
+            // Remember subfolders to visit later
             foreach (var sub in Directory.EnumerateDirectories(dir, "*", EnumerationSettings))
             {
-                if (!IgnoredDirs.Contains(Path.GetFileName(sub)))
-                    pending.Push(sub);
+                if (IgnoredDirs.Contains(Path.GetFileName(sub))) continue;
+
+                // Real symlinks/junctions can point back to a parent folder and form endless loops
+                if (new DirectoryInfo(sub).LinkTarget is not null) continue;
+
+                pending.Push(sub);
             }
         }
     }

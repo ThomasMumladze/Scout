@@ -10,6 +10,9 @@ namespace Dex.Application.Agent;
 /// </summary>
 public class AgentService(ILlmClient llm, IEnumerable<ITool> tools, AgentOptions options)
 {
+    /// <summary>Optional callback that receives a line of text for every step the agent takes.</summary>
+    public Action<string>? OnTrace { get; set; }
+
     // Look up tools by name, because the model refers to them by name in its JSON
     private readonly Dictionary<string, ITool> _tools = tools.ToDictionary(t => t.Name);
 
@@ -32,6 +35,7 @@ public class AgentService(ILlmClient llm, IEnumerable<ITool> tools, AgentOptions
             // Ask the model what to do next and remember its reply in the history
             var reply = await llm.CompleteAsync(messages, ct);
             messages.Add(new(Role.Assistant, reply));
+            OnTrace?.Invoke($"[model] {reply}");
 
             // Interpret the reply: final answer, tool call, or error
             var decision = ToolCallParser.Parse(reply);
@@ -68,6 +72,8 @@ public class AgentService(ILlmClient llm, IEnumerable<ITool> tools, AgentOptions
             {
                 observation = $"Tool error: {ex.Message}";
             }
+
+            OnTrace?.Invoke($"[tool] {call.name} -> {observation}");
 
             // Give the tool result to the model; the next iteration lets it react to it
             messages.Add(new(Role.Tool, $"Observation: {observation}"));

@@ -11,6 +11,8 @@ using var llm = new LLamaSharpClient(new LlmOptions { ModelPath = ModelPath });
 
 var agent = new AgentService(llm, [new FileSearchTool(ProjectRoot)], new AgentOptions());
 
+agent.OnTrace = line => Console.WriteLine($"  {line}");
+
 Console.WriteLine("Scout is ready. Type 'exit' to quit.");
 while (true)
 {
