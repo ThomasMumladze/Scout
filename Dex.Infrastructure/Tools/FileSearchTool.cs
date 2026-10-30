@@ -15,6 +15,12 @@ public class FileSearchTool(string rootDirectory) :ITool
     private static readonly string[] IgnoredDirs = ["bin", "obj", "node_modules", ".git", ".vs"];
     private const int MaxResults = 10;
 
+    private static readonly EnumerationOptions EnumerationSettings = new()
+    {
+        IgnoreInaccessible = true,
+        AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.Hidden | FileAttributes.System
+    };
+
     public string Name => "search_files";
 
     public string Description => "Searches the user's local project files for lines containing a text. " +
@@ -88,32 +94,31 @@ public class FileSearchTool(string rootDirectory) :ITool
 
 
     /// <summary>
-    /// Recursively collects all files with supported extensions under <paramref name="dir"/>,
-    /// skipping ignored folders such as bin, obj and node_modules.
+    /// Collects all files with supported extensions under <paramref name="rootDir"/>.
+    /// Uses an explicit stack instead of recursion, so deep folder trees cannot overflow the call stack.
     /// </summary>
-    private IEnumerable<string> EnumerateFiles(string dir)
+    private IEnumerable<string> EnumerateFiles(string rootDir)
     {
-        // Step 1: look at the files directly inside the current folder
-        foreach (var file in Directory.EnumerateFiles(dir))
+        var pending = new Stack<string>();
+        pending.Push(rootDir);
+
+        while (pending.Count > 0)
         {
-            // Keep only files whose extension is in the allowed list (.cs, .ts, .json, ...)
-            // ToLowerInvariant makes the check case-insensitive (".CS" == ".cs")
+            var dir = pending.Pop();
 
-            if (Extensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
-                yield return file;
-        }
+            // Files directly inside the current folder
+            foreach (var file in Directory.EnumerateFiles(dir, "*", EnumerationSettings))
+            {
+                if (Extensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                    yield return file;
+            }
 
-        // Step 2: go through the subfolders of the current folder
-        foreach (var sub in Directory.EnumerateDirectories(dir))
-        {
-            // Skip folders we never want to search (build output, dependencies, git data)
-            // Path.GetFileName on a folder path returns just the folder name, e.g. "bin"
-
-            if (!IgnoredDirs.Contains(Path.GetFileName(sub)))
-                // Recursion: repeat steps 1 and 2 inside the subfolder,
-                // and pass each file found there up to the caller
-                    foreach (var file in EnumerateFiles(dir))
-                        yield return file;
+            // Remember subfolders to visit later (unless they are on the ignore list)
+            foreach (var sub in Directory.EnumerateDirectories(dir, "*", EnumerationSettings))
+            {
+                if (!IgnoredDirs.Contains(Path.GetFileName(sub)))
+                    pending.Push(sub);
+            }
         }
     }
 }
