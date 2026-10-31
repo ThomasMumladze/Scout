@@ -1,41 +1,55 @@
 # Scout
 
-LLM-based developer assistant that answers questions about local code projects.
+LLM-ზე დაფუძნებული დეველოპერ-ასისტენტი, რომელიც ლოკალური პროექტის ფაილებში პასუხობს კითხვებს კოდზე.
+აგენტი C#-ზეა დაწერილი, მოდელი (Qwen2.5-3B-Instruct, GGUF) კი ლოკალურად გადის LLamaSharp-ით.
 
-## Problem
-Developers working on several projects lose time looking for where something is defined or used.
-Scout takes a question in natural language, decides on its own which tool to use and answers from the real files.
-Target user: a developer (me) who works with multiple local projects.
+## რა პრობლემას ჭრის და ვისთვის
+
+დეველოპერი, რომელიც რამდენიმე პროექტზე მუშაობს, დროს კარგავს იმის ძიებაში, თუ სად არის რაღაც განსაზღვრული ან გამოყენებული.
+Scout ბუნებრივ ენაზე დასმულ კითხვას იღებს, თვითონ წყვეტს, რომელი ხელსაწყო გამოიყენოს, და პასუხს რეალურ ფაილებზე დაყრდნობით აბრუნებს.
+მომხმარებელი: დეველოპერი (მე), რომელიც ლოკალურ პროექტებთან მუშაობს.
 
 ## PEAS
-- **Performance measure:** correct answers about the codebase, correct tool choice, few steps per answer.
-- **Environment:** a local project folder with source files and the user's questions.
-- **Actuators:** text answer in the console, tool calls (file search).
-- **Sensors:** the user's text input and the results returned by tools.
 
-## Environment properties
-1. **Partially observable** - the agent sees only the search results, never the whole project at once.
-2. **Deterministic** - the same search over the same files always returns the same result.
-3. **Sequential** - each tool result influences the next step, so one answer may need several steps.
-4. **Static** - files do not change while the agent is thinking about an answer.
-5. **Discrete** - a finite set of tools, text messages and separate steps.
-6. **Single-agent** - only one agent acts; the user only asks questions.
-7. **Known** - the rules (file system, tool behavior) are fully known in advance.
+- **შესრულების საზომი:** პასუხის სისწორე კოდის ბაზის შესახებ, ხელსაწყოს სწორი არჩევა, ნაბიჯების მცირე რაოდენობა.
+- **გარემო:** ლოკალური პროექტის საქაღალდე (წყაროს ფაილები) და მომხმარებლის კითხვები.
+- **აქტუატორები:** ტექსტური პასუხი კონსოლში და ხელსაწყოების გამოძახება (ფაილების ძებნა).
+- **სენსორები:** მომხმარებლის ტექსტური შეყვანა და ხელსაწყოს მიერ დაბრუნებული შედეგები.
 
-## Agent type
-**Goal-based agent.** The goal is to answer the user's question; the language model chooses a sequence of tool calls
-that leads to it. A simple reflex agent is not enough because the environment is partially observable and sequential,
-and a utility-based agent is unnecessary because there are no trade-offs between competing outcomes.
+## გარემოს თვისებები
 
-## Tools
-- `search_files` - searches a project folder for lines containing a text (written by me).
+1. **ნაწილობრივ დაკვირვებადი:** აგენტი პროექტს მთლიანად არ ხედავს, მხოლოდ ძებნის შედეგებს იღებს.
+2. **დეტერმინისტული:** ერთსა და იმავე ფაილებზე ერთი და იგივე ძებნა ყოველთვის ერთსა და იმავე შედეგს აბრუნებს.
+3. **თანმიმდევრული:** ერთი ძებნის შედეგი განსაზღვრავს შემდეგ ნაბიჯს, ამიტომ პასუხისთვის რამდენიმე ნაბიჯი შეიძლება დასჭირდეს.
+4. **სტატიკური:** აგენტის მსჯელობისას ფაილები არ იცვლება, რადგან პროექტს ამ დროს მხოლოდ მომხმარებელი ეხება და ის პასუხს ელოდება.
+5. **დისკრეტული:** ხელსაწყოების სასრული სიმრავლე, ტექსტური შეტყობინებები და ცალკეული ნაბიჯები.
+6. **ერთაგენტიანი:** მოქმედებს მხოლოდ ერთი აგენტი, მომხმარებელი მხოლოდ კითხვებს სვამს და მასთან კონკურენცია არ არსებობს.
+7. **ცნობილი:** ფაილური სისტემისა და ხელსაწყოების ქცევის წესები წინასწარ ცნობილია.
 
-## Architecture
-Clean Architecture: `Dex.Domain` (entities), `Dex.Application` (agent loop, abstractions),
-`Dex.Infrastructure` (LLamaSharp client, tools), `Scout` (console UI), `Dex.Tests` (xUnit).
+## აგენტის ტიპი
 
-## How to run
-1. Install .NET 10 SDK.
-2. Download `qwen2.5-3b-instruct-q4_k_m.gguf` from Hugging Face (`Qwen/Qwen2.5-3B-Instruct-GGUF`) into `models/`.
-3. Set `ModelPath` and `ProjectRoot` in `Scout/Program.cs`.
-4. `dotnet run --project Scout`
+**Goal-based აგენტი.** მიზანია მომხმარებლის კითხვაზე პასუხის გაცემა, ენის მოდელი კი ხელსაწყოების იმ თანმიმდევრობას ირჩევს, რომელიც ამ მიზანს მიაღწევს.
+Simple reflex აგენტი არ გამოდგებოდა, რადგან გარემო ნაწილობრივ დაკვირვებადი და თანმიმდევრულია: მოქმედების არჩევა წინა ნაბიჯების შედეგებზეა დამოკიდებული.
+Utility-based აგენტი კი ზედმეტია, რადგან არ გვაქვს კონკურენტი შედეგების შედარება.
+
+## ხელსაწყოები
+
+- `search_files` — პროექტის ფაილებში ეძებს ხაზებს, რომლებიც მოცემულ ტექსტს შეიცავს (პარამეტრი `query`, აბრუნებს მაქსიმუმ 10 დამთხვევას `ფაილი:ხაზი: ტექსტი` ფორმატით).
+
+## არქიტექტურა
+
+Clean Architecture:
+
+- `Dex.Domain` — ენტიტები (`ChatMessage`, `Role`, `ToolCall`)
+- `Dex.Application` — აგენტის ციკლი, პარსერი, პრომპტი, ინტერფეისები (`ILlmClient`, `ITool`)
+- `Dex.Infrastructure` — LLamaSharp კლიენტი და ხელსაწყოები
+- `Scout` — კონსოლის ინტერფეისი
+- `Dex.Tests` — xUnit ტესტები (ყალბი მოდელით)
+
+## როგორ გაეშვება
+
+1. დააყენე .NET 10 SDK.
+2. Hugging Face-იდან (`Qwen/Qwen2.5-3B-Instruct-GGUF`) ჩამოტვირთე `qwen2.5-3b-instruct-q4_k_m.gguf` (დაახლოებით 2 GB) და ჩადე `models/` საქაღალდეში. token არ არის საჭირო.
+3. `Scout/Program.cs`-ში შეცვალე `ModelPath` და `ProjectRoot` შენს გზებზე.
+4. გაუშვი: `dotnet run --project Scout`
+5. ტესტები: `dotnet test`
