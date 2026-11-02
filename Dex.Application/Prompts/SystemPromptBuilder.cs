@@ -14,6 +14,8 @@ public static class SystemPromptBuilder
         sb.AppendLine("To answer the user: {\"final_answer\": \"<your answer>\"}");
         sb.AppendLine();
         sb.AppendLine("Available tools:");
+        sb.AppendLine("- Choose the tool whose description matches the request.");
+        sb.AppendLine("- If no tool fits the request, answer directly with final_answer and say that you cannot do it.");
         foreach (var t in tools)
             sb.AppendLine($"- {t.Name}: {t.Description} Parameters: {t.Parameters}");
         return sb.ToString();
