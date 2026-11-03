@@ -21,24 +21,23 @@ public static class ToolCallParser
         // Small models often wrap JSON in extra text, so take everything between the first { and the last }
         var start = modelOutput.IndexOf('{');
         var end = modelOutput.LastIndexOf('}');
-
-        // No braces at all (or in the wrong order) means there is nothing to parse
         if (start < 0 || end <= start)
             return new(null, null, "No JSON object found.");
 
         try
         {
-            // [start..(end + 1)] is a range: it cuts out the substring from { to }
-            // 'using var' disposes the document when the method ends
             using var doc = JsonDocument.Parse(modelOutput[start..(end + 1)]);
             var root = doc.RootElement;
 
-            // Case 1: the model is done and gives the answer to the user
-            if (root.TryGetProperty("final_answer", out var answer))
+            var hasAnswer = root.TryGetProperty("final_answer", out var answer);
+            var hasTool = root.TryGetProperty("tool", out var name);
+
+            // If the model returns both keys, the tool call wins. Its final_answer was written before the tool ran,
+            // so it cannot be trusted; the model will write a real answer after it sees the tool result.
+            if (hasAnswer && !hasTool)
                 return new(null, answer.GetString() ?? "", null);
 
-            // Case 2: the model wants to use a tool
-            if (root.TryGetProperty("tool", out var name))
+            if (hasTool)
             {
                 // Clone so the element stays valid after the JsonDocument is disposed
                 // If the model forgot "args", use an empty object instead of failing
@@ -49,13 +48,11 @@ public static class ToolCallParser
                 return new(new ToolCall(name.GetString() ?? "", args), null, null);
             }
 
-            // Valid JSON, but it has neither of the keys we expect
             return new(null, null, "JSON must contain either \"tool\" or \"final_answer\".");
         }
-        catch (JsonException ex)
+        // GetString() throws InvalidOperationException when the value is not a string (e.g. {"final_answer": 5})
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
-            // The text between the braces is not valid JSON (missing quote, trailing comma, ...)
-            // The message is sent back to the model so it can fix its own output
             return new(null, null, $"Invalid JSON: {ex.Message}");
         }
     }

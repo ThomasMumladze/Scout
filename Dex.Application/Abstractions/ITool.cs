@@ -15,5 +15,8 @@ namespace Dex.Application.Abstractions
 
         /// <summary>R+uns the tool and returns the result as text.</summary>
         Task<string> RunAsync(JsonElement args, CancellationToken ct = default);
+
+        /// <summary>An example tool call that is shown to the model, e.g. {"tool": "name", "args": {...}}.</summary>
+        string Example => string.Empty;
     }
 }

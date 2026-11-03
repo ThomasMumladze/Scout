@@ -16,8 +16,15 @@ public static class SystemPromptBuilder
         sb.AppendLine("Available tools:");
         sb.AppendLine("- Choose the tool whose description matches the request.");
         sb.AppendLine("- If no tool fits the request, answer directly with final_answer and say that you cannot do it.");
+        sb.AppendLine("- Never claim that an action was done (task added, file found, ...) unless you have seen the tool result for it.");
+
         foreach (var t in tools)
+        {
             sb.AppendLine($"- {t.Name}: {t.Description} Parameters: {t.Parameters}");
+            if (!string.IsNullOrEmpty(t.Example))
+                sb.AppendLine($"  Example: {t.Example}");
+        }
+
         return sb.ToString();
     }
 }
