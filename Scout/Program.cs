@@ -9,6 +9,7 @@ const string ModelPath = @"C:\Users\mumla\Desktop\Scout\models\qwen2.5-3b-instru
 const string ProjectRoot = @"C:\Users\mumla\Desktop\Scout";
 const string TodoFile = @"C:\Users\mumla\Desktop\Scout\data\todos.json";
 
+Console.OutputEncoding = System.Text.Encoding.UTF8;
 Console.WriteLine("Loading model...");
 
 using var llm = new LLamaSharpClient(new LlmOptions { ModelPath = ModelPath });
