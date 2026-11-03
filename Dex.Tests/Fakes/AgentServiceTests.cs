@@ -101,6 +101,19 @@ public class AgentServiceTests
     }
 
     [Fact]
+    public async Task Accepts_final_answer_sent_together_with_tool_once_a_tool_result_exists()
+    {
+        var both = """{"final_answer": "answer after tool", "tool": "calc", "args": {}}""";
+        var llm = new FakeLlmClient(both, both);
+        var agent = CreateAgent(llm, new FakeTool("calc", _ => "42"));
+
+        var result = await agent.RunAsync("test");
+
+        // First reply: tool runs, answer ignored. Second reply: tool result already seen, so the answer is accepted.
+        Assert.Equal("answer after tool", result);
+    }
+
+    [Fact]
     public async Task Recovers_when_final_answer_is_not_a_string()
     {
         var llm = new FakeLlmClient(

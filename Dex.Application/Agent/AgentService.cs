@@ -40,8 +40,11 @@ public class AgentService(ILlmClient llm, IEnumerable<ITool> tools, AgentOptions
             // Interpret the reply: final answer, tool call, or error
             var decision = ToolCallParser.Parse(reply);
 
-            // The model is done: return its answer to the user
-            if (decision.FinalAnswer is not null)
+            // The model is done: return its answer to the user.
+            // If the same reply also asked for a tool, the answer is trusted only after at least one tool result
+            // has been seen; before that it was written without knowing the result and may be invented.
+            var seenToolResult = messages.Any(m => m.Role == Role.Tool);
+            if (decision.FinalAnswer is not null && (decision.ToolCall is null || seenToolResult))
                 return decision.FinalAnswer;
 
             // Invalid JSON: ask the model to try again, but only a limited number of times

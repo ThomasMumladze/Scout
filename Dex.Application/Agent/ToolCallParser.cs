@@ -32,11 +32,6 @@ public static class ToolCallParser
             var hasAnswer = root.TryGetProperty("final_answer", out var answer);
             var hasTool = root.TryGetProperty("tool", out var name);
 
-            // If the model returns both keys, the tool call wins. Its final_answer was written before the tool ran,
-            // so it cannot be trusted; the model will write a real answer after it sees the tool result.
-            if (hasAnswer && !hasTool)
-                return new(null, answer.GetString() ?? "", null);
-
             if (hasTool)
             {
                 // Clone so the element stays valid after the JsonDocument is disposed
@@ -45,8 +40,13 @@ public static class ToolCallParser
                     ? a.Clone()
                     : JsonDocument.Parse("{}").RootElement.Clone();
 
-                return new(new ToolCall(name.GetString() ?? "", args), null, null);
+                // When the model sends both keys, keep both: the agent decides which one to trust
+                var answerText = hasAnswer ? answer.GetString() ?? "" : null;
+                return new(new ToolCall(name.GetString() ?? "", args), answerText, null);
             }
+
+            if (hasAnswer)
+                return new(null, answer.GetString() ?? "", null);
 
             return new(null, null, "JSON must contain either \"tool\" or \"final_answer\".");
         }
