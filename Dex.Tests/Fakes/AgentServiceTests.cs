@@ -84,4 +84,32 @@ public class AgentServiceTests
 
         Assert.Contains("step limit", result);
     }
+
+    [Fact]
+    public async Task Runs_tool_and_ignores_final_answer_when_response_has_both()
+    {
+        var llm = new FakeLlmClient(
+            """{"final_answer": "Task added", "tool": "calc", "args": {}}""",
+            """{"final_answer": "done"}""");
+        var agent = CreateAgent(llm, new FakeTool("calc", _ => "42"));
+
+        var result = await agent.RunAsync("test");
+
+        // The unverified answer is not returned; the tool ran and its result was fed back to the model
+        Assert.Equal("done", result);
+        Assert.Contains("Observation: 42", llm.Calls[1][^1].Content);
+    }
+
+    [Fact]
+    public async Task Recovers_when_final_answer_is_not_a_string()
+    {
+        var llm = new FakeLlmClient(
+            """{"final_answer": 5}""",
+            """{"final_answer": "five"}""");
+        var agent = CreateAgent(llm);
+
+        var result = await agent.RunAsync("test");
+
+        Assert.Equal("five", result);
+    }
 }
