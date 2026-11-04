@@ -15,6 +15,6 @@
         public int MaxTokens { get; set; } = 512;
 
         /// <summary>Lower values make the output more predictable.</summary>
-        public float Temperature { get; set; } = 0.2f;
+        public float Temperature { get; set; } = 0.1f;
     }
 }

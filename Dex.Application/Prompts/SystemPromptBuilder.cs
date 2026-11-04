@@ -19,6 +19,8 @@ public static class SystemPromptBuilder
         sb.AppendLine("- Never claim that an action was done (task added, file found, ...) unless you have seen the tool result for it.");
         sb.AppendLine("- All the tools you can use are listed below. Never say that a tool is missing or that you cannot search; try a tool first.");
         sb.AppendLine("- To find where a FILE is located by its name, use find_files. To find where code (a class or method) is defined or used, use search_files.");
+        sb.AppendLine("- Every reply is ONE JSON object with exactly one top-level key: either \"tool\" or \"final_answer\", never both.");
+        sb.AppendLine("- Use only the parameters listed for the tool. Do not invent extra parameters.");
 
         foreach (var t in tools)
         {
