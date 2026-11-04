@@ -17,10 +17,10 @@ using var llm = new LLamaSharpClient(new LlmOptions { ModelPath = ModelPath });
 var tools = new ITool[]
 {
     new FileSearchTool(ProjectRoot),
+    new FindFilesTool(ProjectRoot),
     new GitLogTool(ProjectRoot),
     new TodoTool(new TodoStore(TodoFile))
 };
-
 var agent = new AgentService(llm, tools, new AgentOptions());
 
 agent.OnTrace = line => Console.WriteLine($"  {line}");
