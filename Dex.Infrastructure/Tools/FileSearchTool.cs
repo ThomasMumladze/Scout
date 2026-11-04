@@ -1,36 +1,34 @@
-﻿using Dex.Application.Abstractions;
-using System.Text.Json;
+﻿using System.Text.Json;
+using Dex.Application.Abstractions;
+
 namespace Dex.Infrastructure.Tools;
 
 /// <summary>
 /// Name: search_files.
-/// Description: searches a local project folder for lines containing the given text.
+/// Description: searches the text INSIDE the files of a local project folder for lines containing the given text.
 /// Parameters: query (string) - the text to look for.
 /// Returns: up to 10 matches as "relative/path:line: text", or a "No matches" message.
 /// </summary>
-/// 
-public class FileSearchTool(string rootDirectory) :ITool
+public class FileSearchTool(string rootDirectory) : ITool
 {
-    private static readonly string[] Extensions = [".cs", ".ts", ".tsx", ".js", ".jsx", ".json", ".scss", ".css", ".html", ".md", ".csproj"];
-    private static readonly string[] IgnoredDirs = ["bin", "obj", "node_modules", ".git", ".vs"];
-    private const int MaxResults = 10;
+    // Only text-based files are searched; binary files make no sense for a line search
+    private static readonly string[] Extensions =
+        [".cs", ".ts", ".tsx", ".js", ".jsx", ".json", ".scss", ".css", ".html", ".md", ".csproj"];
 
-    // Do not skip ReparsePoint here: OneDrive placeholders have that attribute too
-    private static readonly EnumerationOptions EnumerationSettings = new()
-    {
-        IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.System
-    };
+    private const int MaxResults = 10;
 
     public string Name => "search_files";
 
     public string Description =>
-    "Searches the user's local C# project files for lines containing a text. " +
-    "Use it when the user asks where something is defined or used in the code. " +
-    "The query must be a short exact identifier such as a class or method name (for example 'ToolCallParser'). " +
-    "Do not add language keywords like 'def' or 'class' to the query.";
+        "Searches the text INSIDE the user's local C# project files for lines containing a text. " +
+        "Use it when the user asks where something is defined or used in the code. " +
+        "The query must be a short exact identifier such as a class or method name (for example 'ToolCallParser'). " +
+        "Do not add language keywords like 'def' or 'class' to the query. " +
+        "Do not use it to find a file by its name.";
 
     public string Parameters => "{\"query\": \"string\"}";
+
+    public string Example => "{\"tool\": \"search_files\", \"args\": {\"query\": \"AgentService\"}}";
 
     /// <summary>
     /// Runs the search_files tool.
@@ -41,44 +39,40 @@ public class FileSearchTool(string rootDirectory) :ITool
     public Task<string> RunAsync(JsonElement args, CancellationToken ct = default)
     {
         // Validate the input: the model must provide a non-empty "query" string
-        if (!args.TryGetProperty("query", out var query) || string.IsNullOrWhiteSpace(query.GetString()))
-            throw new ArgumentException("Missing or empty 'query' parameter.");
+        var queryString = ToolArgs.GetString(args, "query")
+            ?? throw new ArgumentException("Missing or empty 'query' parameter.");
 
         // Validate the environment: the project folder must exist on disk
         if (!Directory.Exists(rootDirectory))
             throw new DirectoryNotFoundException($"The specified root directory '{rootDirectory}' does not exist.");
 
-        // Extract the plain string from the JSON value ('!' is safe, it was checked above)
-        var queryString = query.GetString()!;
-
         // Search is lazy, so Take(MaxResults) stops the scan after enough matches are found;
         // ToList() runs the search right now and stores the results
         var results = Search(queryString, ct).Take(MaxResults).ToList();
 
-        // Return a readable message for the model: either "no matches" or one match per line.
-        // The method is not async, so the result is wrapped in a completed Task
+        // Return a readable message for the model: either "no matches" or one match per line
         return Task.FromResult(results.Count == 0
             ? $"No matches found for '{queryString}'. Try again with only the bare identifier name, without extra words or keywords."
             : string.Join("\n", results));
-
     }
 
     /// <summary>
     /// Lazily searches every supported file under the root directory and yields one result
     /// per matching line, formatted as "relative/path:lineNumber: line text".
     /// </summary>
-
     private IEnumerable<string> Search(string query, CancellationToken ct)
     {
-        // Walk through all allowed files (bin, obj, node_modules, etc. are already filtered out)
-        foreach (var file in EnumerateFiles(rootDirectory))
+        // ProjectFiles skips bin, obj, node_modules etc.; we keep only text-based files
+        var files = ProjectFiles.Enumerate(rootDirectory)
+            .Where(f => Extensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
+
+        foreach (var file in files)
         {
             var lineNumber = 0;
 
             // ReadLines streams the file line by line instead of loading it all into memory
             foreach (var line in File.ReadLines(file))
             {
-
                 // Allow the search to be cancelled between lines
                 ct.ThrowIfCancellationRequested();
                 lineNumber++;
@@ -95,39 +89,4 @@ public class FileSearchTool(string rootDirectory) :ITool
             }
         }
     }
-
-
-    /// <summary>
-    /// Collects all files with supported extensions under <paramref name="rootDir"/>.
-    /// Uses an explicit stack instead of recursion, so deep folder trees cannot overflow the call stack.
-    /// </summary>
-    private IEnumerable<string> EnumerateFiles(string rootDir)
-    {
-        var pending = new Stack<string>();
-        pending.Push(rootDir);
-
-        while (pending.Count > 0)
-        {
-            var dir = pending.Pop();
-
-            // Files directly inside the current folder
-            foreach (var file in Directory.EnumerateFiles(dir, "*", EnumerationSettings))
-            {
-                if (Extensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
-                    yield return file;
-            }
-
-            // Remember subfolders to visit later
-            foreach (var sub in Directory.EnumerateDirectories(dir, "*", EnumerationSettings))
-            {
-                if (IgnoredDirs.Contains(Path.GetFileName(sub))) continue;
-
-                // Real symlinks/junctions can point back to a parent folder and form endless loops
-                if (new DirectoryInfo(sub).LinkTarget is not null) continue;
-
-                pending.Push(sub);
-            }
-        }
-    }
 }
-
